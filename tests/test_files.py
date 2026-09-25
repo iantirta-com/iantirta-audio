@@ -9,9 +9,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from iantirta.karaoke.audio.files import AudioFile, get_audio_info, load_audio
+from iantirta.audio.files import AudioFile, get_audio_info, load_audio
 
 # Helper for writing mock audio
+
 
 def _write_wav(
     path,
@@ -76,7 +77,7 @@ def test_get_audio_info(tmp_path):
     )
 
     info = get_audio_info(path)
-    
+
     assert info.path == path
     assert info.sample_rate == 16000
     assert info.channels == 2

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iantirta-audio"
-version = "0.1.0a1"
+version = "0.1.0"
 
 authors = [
     { name = "Iantirta.com", email = "ian@iantirta.com" },
@@ -53,8 +53,8 @@ dependencies = [
 
 
 [project.optional-dependencies]
-separation = ["torch", "demucs",]
-asr = ["torch", "transformers",]
+separation = ["torch",]
+asr = ["torch",]
 
 all = ["iantirta-audio[separation, asr]",]
 
@@ -66,9 +66,9 @@ dev = ["iantirta-audio[test, all]"]
 [project.urls]
 Homepage = "https://iantirta.com"
 Documentation = "https://readthedocs.org"
-Repository = "https://github.com/iantirta-com/iantirta-audio.git"
-"Bug Tracker" = "https://github.com/iantirta-com/iantirta-audio/spam/issues"
-Changelog = "https://github.com/iantirta-com/iantirta-audio/spam/blob/master/CHANGELOG.md"
+Repository = "https://github.com/iantirta-com/iantirta-audio"
+"Bug Tracker" = "https://github.com/iantirta-com/iantirta-audio/issues"
+Changelog = "https://github.com/iantirta-com/iantirta-audio/blob/main/CHANGELOG.md"
 
 
 [tool.setuptools.packages.find]
