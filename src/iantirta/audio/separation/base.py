@@ -6,9 +6,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
-
+import torch
 from iantirta.audio.files import AudioFile
+from collections.abc import Callable
 
+from iantirta.models.vendor.transformers.audio_utils import load_audio
+from iantirta.models.demucs.apply import apply_model, _replace_dict
 
 def _get_device(device: str | None = None):
     """Select the torch device used for separation.
@@ -52,7 +55,7 @@ def _get_device(device: str | None = None):
 
 
 @dataclass(frozen=True, slots=True)
-class SeparationOptions:
+class SeparationConfig:
     """Configuration for audio source separation.
 
     Parameters
@@ -82,10 +85,21 @@ class SeparationOptions:
     """
 
     model_name: str = "mdx_extra_q"
-    device: str | None = field(_default_factory=_get_device)
+    device: str | None = field(default_factory=_get_device)
+
+    shifts: int = 1
+    overlap: float = 0.25
+    split: bool = True,
+    segment: float | None = None
+
+    progress: bool = False,
+    callback: Callable[[dict], None] | None = None,
+    callback_arg: dict | None = None,
+
+    num_workers: int = 0
 
     @classmethod
-    def from_dict(cls, options: dict) -> SeparationOptions:
+    def from_dict(cls, options: dict) -> SeparationConfig:
         return cls(**options)
 
 
@@ -109,12 +123,66 @@ class SeparationResult:
 class Separator(Protocol):
     """Protocol implemented by audio separation backends."""
 
+    def __init__(
+        self,
+        *,
+        config: dict | SeparationConfig | None = None,
+        **kwargs,
+    ):
+        if not isinstance(config, SeparationConfig):
+            if config and isinstance(config, dict):
+                config = SeparationConfig.from_dict(**config)
+            elif kwargs and isinstance(kwargs, dict):
+                config = SeparationConfig.from_dict(**kwargs)
+            else:
+                config = SeparationConfig()
+        self.config = config
+
+        from iantirta.models.demucs import DemucsBagOfModel
+        self.model = DemucsBagOfModel.from_pretrained(self.config.model_name)
+        self.model.eval()
+
+        self.samplerate = self.model.samplerate
+        self.audio_channels = self.model.audio_channels
+
+    
+    def separate_tensor(self, wav, sr):
+        if sr is not None and self.samplerate != sr:
+            raise ValueError()
+        ref = wav.mean(0)
+        mean = ref.mean()
+        std = ref.std() + 1e-8
+        out = apply_model(
+            self.model,
+            ((wav - mean) / std)[None],
+            segment=self.config.segment,
+            shifts=self.config.shifts,
+            split=self.config.split,
+            overlap=self.config.overlap,
+            device=self.config.device,
+            num_workers=self.config.num_workers,
+            callback=self.config.callback,
+            callback_arg=_replace_dict(
+                self.config.callback_arg, ("audio_length", wav.shape[1])
+            ),
+            progress=self.config.progress,
+        )
+        out = out * std + mean
+        return (wav, dict(zip(self.model.sources, out[0])))
+
+    
+    def separate_audio_file(self, track):
+        audionp = load_audio(str(track))
+        return self.separate_tensor(
+            torch.from_numpy(audionp), self.samplerate
+        )
+
+    
     def separate(
         self,
-        input: str | Path | AudioFile,
+        tracks: str | Path | list[str] | list[Path],
         *,
         output_dir: str | Path | None = None,
-        options: SeparationOptions | None = None,
     ) -> SeparationResult:
         """Separate an audio file into vocals and instrumental audio.
 
@@ -135,4 +203,15 @@ class Separator(Protocol):
         SeparationResult
             Separated vocal and instrumental audio files.
         """
-        ...
+        if not isinstance(tracks, list):
+            tracks = [tracks]
+
+        results = []
+        for track in tracks:
+            origin, res = self.separate_audio_file(track)
+            results.append(SeparationResult(
+                instrumental = origin - res["vocals"],
+                vocals = res["vocals"]
+            ))
+            del origin, res
+        return results
