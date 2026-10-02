@@ -3,15 +3,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
-import torch
-from iantirta.audio.files import AudioFile
-from collections.abc import Callable
 
+import torch
+from iantirta.models.demucs.apply import _replace_dict, apply_model
 from iantirta.models.vendor.transformers.audio_utils import load_audio
-from iantirta.models.demucs.apply import apply_model, _replace_dict
+
+from iantirta.audio.files import AudioFile
+
 
 def _get_device(device: str | None = None):
     """Select the torch device used for separation.
@@ -89,12 +91,12 @@ class SeparationConfig:
 
     shifts: int = 1
     overlap: float = 0.25
-    split: bool = True,
+    split: bool = True
     segment: float | None = None
 
-    progress: bool = False,
-    callback: Callable[[dict], None] | None = None,
-    callback_arg: dict | None = None,
+    progress: bool = False
+    callback: Callable[[dict], None] | None = None
+    callback_arg: dict | None = None
 
     num_workers: int = 0
 
@@ -120,7 +122,7 @@ class SeparationResult:
     instrumental: AudioFile
 
 
-class Separator(Protocol):
+class Separator:
     """Protocol implemented by audio separation backends."""
 
     def __init__(

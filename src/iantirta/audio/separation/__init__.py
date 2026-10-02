@@ -14,50 +14,55 @@ __all__ = [
 ]
 
 
-# def separate(
-#     input: str | Path,
-#     *,
-#     output_dir: str | Path | None = None,
-#     options: SeparationOptions | dict | None = None,
-# ) -> SeparationResult:
-#     """Separate an audio file into vocals and instrumental audio.
+def separate(
+    tracks: str | Path | list[str] | list[Path],
+    *,
+    output_dir: str | Path | None = None,
+    options: SeparationConfig | dict | None = None,
+    **kwargs,
+) -> SeparationResult:
+    """Separate an audio file into vocals and instrumental audio.
 
-#     Parameters
-#     ----------
-#     input:
-#         Path to the input audio file.
+    Parameters
+    ----------
+    input:
+        Path to the input audio file.
 
-#     output_dir:
-#         Directory where separated files are written. If ``None``, an
-#         output directory is created next to the input file.
+    output_dir:
+        Directory where separated files are written. If ``None``, an
+        output directory is created next to the input file.
 
-#     options:
-#         Separation configuration. If omitted, the default configuration
-#         is used.
+    options:
+        Separation configuration. If omitted, the default configuration
+        is used.
 
-#     Returns
-#     -------
-#     SeparationResult
-#         The separated vocal and instrumental audio files.
+    Returns
+    -------
+    SeparationResult
+        The separated vocal and instrumental audio files.
 
-#     Raises
-#     ------
-#     FileNotFoundError
-#         If the input file does not exist.
+    Raises
+    ------
+    FileNotFoundError
+        If the input file does not exist.
 
-#     RuntimeError
-#         If the separation backend cannot be loaded.
+    RuntimeError
+        If the separation backend cannot be loaded.
 
-#     ValueError
-#         If the separation options are invalid.
-#     """
-#     from .demucs import DemucsSeparator, DemucsOptions
+    ValueError
+        If the separation options are invalid.
+    """
 
-#     if not isinstance(options, DemucsOptions):
-#         options = DemucsOptions.from_dict(options)
+    if not isinstance(options, SeparationConfig):
+        if options and isinstance(options, dict):
+            options = SeparationConfig.from_dict(options)
+        elif kwargs and isinstance(kwargs, dict):
+            options = SeparationConfig.from_dict(kwargs)
+        else:
+            options = SeparationConfig()
 
-#     separator = DemucsSeparator(options=options)
-#     return separator.separate(
-#         input,
-#         output_dir=output_dir,
-#     )
+    separator = Separator(options=options)
+    return separator.separate(
+        tracks,
+        output_dir=output_dir,
+    )
