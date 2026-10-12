@@ -10,7 +10,7 @@ from typing import Protocol
 
 import torch
 from iantirta.models.demucs.apply import _replace_dict, apply_model
-from iantirta.models.vendor.transformers.audio_utils import load_audio
+from iantirta.models.audio_utils import load_audio
 
 from iantirta.audio.files import AudioFile
 
