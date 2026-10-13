@@ -3,13 +3,17 @@
 
 from importlib.metadata import version
 
-from .files import AudioData, AudioFile, get_audio_info, load_audio
+from ._audio import AudioLoader, convert_audio_channels
+
+# from .files import AudioData, AudioFile, get_audio_info, load_audio
+from .load_audio_utils import load_audio
+from .save_audio_utils import save_audio
 
 __all__ = [
-    "AudioData",
-    "AudioFile",
-    "get_audio_info",
+    "AudioLoader",
+    "convert_audio_channels",
     "load_audio",
+    "save_audio",
 ]
 
 __version__ = version("iantirta-audio")
