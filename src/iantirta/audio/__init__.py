@@ -1,19 +1,20 @@
 # Part of Iantirta.com
 # See LICENSE file for full copyright and licensing details.
 
-from importlib.metadata import version
+from typing import TYPE_CHECKING
 
-from ._audio import AudioLoader, convert_audio_channels
+from iantirta.lazy_import import LazyModule, define_import_structure
 
-# from .files import AudioData, AudioFile, get_audio_info, load_audio
-from .load_audio_utils import load_audio
-from .save_audio_utils import save_audio
-
-__all__ = [
-    "AudioLoader",
-    "convert_audio_channels",
-    "load_audio",
-    "save_audio",
-]
-
-__version__ = version("iantirta-audio")
+if TYPE_CHECKING:
+    from .load_audio_utils import *
+    from .save_audio_utils import *
+else:
+    import sys
+    
+    _file = globals()["__file__"]
+    sys.modules[__name__] = LazyModule(
+        __name__,
+        _file,
+        define_import_structure(_file),
+        module_spec=__spec__,
+    )

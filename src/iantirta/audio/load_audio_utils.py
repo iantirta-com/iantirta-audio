@@ -182,7 +182,7 @@ def load_audio(
     sampling_rate: int | None = None,
     num_channels: int | None = None,
     backend: str = "auto",
-) -> np.ndarray:
+) -> tuple[np.ndarray, int]:
 
     if isinstance(audio, np.ndarray):
         return audio

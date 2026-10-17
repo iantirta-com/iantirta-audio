@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-
 from kplus.pipelines.audio import detect_audio_activity as kplus_detect
+
 from iantirta.audio.detection import detect_audio_activity as iantirta_detect
 
 
