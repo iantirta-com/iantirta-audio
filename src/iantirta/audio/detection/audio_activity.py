@@ -323,3 +323,4 @@ if __name__ == '__main__':
     from IPython.display import display, Audio
     wav, sr = load_audio(audio_path)
     display(Audio(wav, rate=sr))
+    from huggingface_hub import upload_file
