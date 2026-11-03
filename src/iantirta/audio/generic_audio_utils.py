@@ -1,24 +1,38 @@
 
-import numpy as np
+
+from dataclasses import dataclass
+
+__all__ = [
+    "AudioSegment",
+    "HumanTiming",
+    "TimingMixin",
+]
 
 
-def slice_np(
-    wav: np.ndarray,
-    start: float,
-    end: float,
-    sr: int,
-) -> np.ndarray:
+@dataclass
+class HumanTiming:
+    pass
+
+@dataclass(slots=True)
+class TimingMixin:
     """
-    This method will chunk/slice given audio,
-    with the new one respecting the start and end ts.
-
-    :param np.ndarray wav:
+    Class that represent timing in seconds
+    
     :param float start:
-        start ts in seconds
     :param float end:
-        end ts in seconds
-    :param int sr:
-    :return: New chunked audio.
-    :rtype: np.ndarray
     """
-    return wav[int(start*sr):int(end*sr)]
+    start: float
+    end: float
+
+    @property
+    def duration(self) -> float:
+        if self.start is None or self.end is None:
+            return 0.0
+        return float(
+            round(self.end - self.start, 2)
+        )
+
+
+@dataclass(slots=True)
+class AudioSegment(TimingMixin):
+    pass
