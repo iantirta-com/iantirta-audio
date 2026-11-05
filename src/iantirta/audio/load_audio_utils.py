@@ -178,7 +178,7 @@ def get_file_type_from_bytes(data: bytes) -> str:
 
 
 def load_audio(
-    audio: str | Path | np.ndarray,
+    audio: str | Path | os.PathLike | np.ndarray,
     sampling_rate: int | None = None,
     num_channels: int | None = None,
     backend: str = "auto",
@@ -187,7 +187,7 @@ def load_audio(
     if isinstance(audio, np.ndarray):
         return audio
 
-    if not isinstance(audio, (str, Path)):
+    if not isinstance(audio, (str, Path, os.PathLike)):
         raise TypeError(
             "Incorrect format used for `audio`. Should be a numpy array or a `str`: an `http(s)://` URL, "
             "a local file path, or a base64-encoded string (optionally wrapped as a `data:...` URI)."
@@ -195,12 +195,14 @@ def load_audio(
 
     audio = str(audio)
     filetype = get_file_type_from_source(audio)
+    logger.debug(f'load audio filetype: {filetype}')
 
     audio_source = resolve_audio_from_source(audio)
 
     use_torchcodec = False
     if backend == "torchcodec" or (backend == "auto" and filetype in TORCHCODEC_ONLY_FILETYPES):
         use_torchcodec = _is_torchcodec_available()
+    logger.debug(f'load audio torchcodec: {use_torchcodec}')
 
     if isinstance(audio_source, bytes) and filetype is None and not use_torchcodec:
         try:
@@ -212,16 +214,19 @@ def load_audio(
     if use_torchcodec:
         from torchcodec.decoders import AudioDecoder
 
+        logger.debug('load audio using torchcodec')
+
         audio_samples = AudioDecoder(
             audio_source,
             sample_rate=sampling_rate,
             num_channels=num_channels
         ).get_all_samples()
-        return audio_samples.data[0].numpy(), sampling_rate if sampling_rate is not None else audio_samples.sample_rate
-    
+        return audio_samples.data.numpy(), sampling_rate if sampling_rate is not None else audio_samples.sample_rate
+
     elif not use_torchcodec and filetype in TORCHCODEC_ONLY_FILETYPES:
         from ._audio import AudioLoader
 
+        logger.debug('load audio using AudioLoader')
         audio_samples = AudioLoader(audio_source)
         return audio_samples.read(
             streams=0, sampling_rate=sampling_rate, num_channels=num_channels
@@ -232,6 +237,8 @@ def load_audio(
             from io import BytesIO
 
             import torchaudio
+
+            logger.debug('load audio using torchaudio')
             wav, src_sr = torchaudio.load(BytesIO(audio_source) if isinstance(audio_source, bytes) else audio_source)
 
             if sampling_rate and sampling_rate != src_sr:
@@ -244,6 +251,8 @@ def load_audio(
 
         try:
             import librosa
+
+            logger.debug('load audio using librosa')
 
             return librosa.load(
                 BytesIO(audio_source) if isinstance(audio_source, bytes)
@@ -260,11 +269,3 @@ def load_audio(
             ).numpy(), sampling_rate if sampling_rate is not None else audio_samples.samplerate()
 
     raise ValueError()
-
-
-if __name__ == "__main__":
-    video_path = Path("../dataset/mahalini.mp4")
-    audio_path = Path("../dataset/mahalini.wav")
-    assert audio_path.is_file()
-
-    load_audio(audio_path)

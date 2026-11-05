@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 __all__ = [
     "AudioLoader",
     "convert_audio_channels",
-    "slice_np"
+    "slice_audio"
 ]
 
 
@@ -225,26 +225,26 @@ def convert_audio_channels(
     return wav
 
 
-def slice_np(
-    wav: "np.ndarray",
+def slice_audio(
+    wav: "np.ndarray | torch.Tensor",
     start: float,
     end: float,
     sr: int,
-) -> "np.ndarray":
+) -> "np.ndarray | torch.Tensor":
     """
     This method will chunk/slice given audio,
     with the new one respecting the start and end ts.
 
-    :param np.ndarray wav:
+    :param np.ndarray | torch.Tensor wav:
     :param float start:
         start ts in seconds
     :param float end:
         end ts in seconds
     :param int sr:
     :return: New chunked audio.
-    :rtype: np.ndarray
+    :rtype: np.ndarray | torch.Tensor
     """
-    return wav[int(start*sr):int(end*sr)]
+    return wav[..., round(start*sr):round(end*sr)]
 
 
 if __name__ == "__main__":

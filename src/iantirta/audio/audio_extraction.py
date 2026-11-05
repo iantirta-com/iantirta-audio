@@ -95,13 +95,15 @@ class MelSpectrogramFeature(AudioFeature):
     """
     Represent Log Mel Spectrogram Feature
     """
-    S: np.ndarray
+    S: np.ndarray | None = None
 
 
 class AudioExtraction:
     """
     Class that will extract audio features.
     """
+    _rms = None
+
     def __init__(
         self,
         wav: np.ndarray,

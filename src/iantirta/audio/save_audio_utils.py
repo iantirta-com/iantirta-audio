@@ -1,4 +1,5 @@
 
+import logging
 import struct
 import subprocess
 from pathlib import Path
@@ -13,6 +14,9 @@ if TYPE_CHECKING:
 __all__ = [
     "save_audio"
 ]
+
+
+_logger = logging.getLogger(__name__)
 
 
 def prevent_clip(wav: "torch.Tensor", mode='rescale'):
@@ -57,8 +61,16 @@ def encode_mp3(
     quality: Literal[2, 3, 4, 5, 6, 7] = 2,
     verbose: bool = False
 ):
-    """Save given audio as mp3. This should work on all OSes."""
+    """
+    Save given audio as mp3. This should work on all OSes.
+    """
     import lameenc
+
+    _logger.debug(
+        'saving audio with .mp3 '
+        f'sr={samplerate}, bitrate={bitrate}, '
+        f'quality={quality}'
+    )
 
     C, T = wav.shape
     wav = i16_pcm(wav)
@@ -86,9 +98,11 @@ def _pcm_bytes(
     wav: "torch.Tensor",
     bits_per_sample: int
 ) -> bytes:
-    """Convert a `[C, T]` float tensor to raw interleaved little-endian PCM bytes.
+    """
+    Convert a `[C, T]` float tensor to raw interleaved little-endian PCM bytes.
     24 bits samples are stored over the top bits of an int32, so that the low byte
-    can either be stripped (wav) or truncated by the encoder (ffmpeg flac)."""
+    can either be stripped (wav) or truncated by the encoder (ffmpeg flac).
+    """
     frames = wav.clamp(-1, 1).t().contiguous().cpu().numpy()
 
     if bits_per_sample == 16:
@@ -109,8 +123,16 @@ def encode_wav(
     bits_per_sample: int = 16,
     as_float: bool = False
 ):
-    """Save the given `[C, T]` float tensor as a wav file, either as 16 / 24 bits PCM,
-    or as float32 (`as_float=True`)."""
+    """
+    Save the given `[C, T]` float tensor as a wav file, either as 16 / 24 bits PCM,
+    or as float32 (`as_float=True`).
+    """
+    _logger.debug(
+        'saving audio with .wav '
+        f'sr={samplerate}, bps={bits_per_sample}, '
+        f'as_float={as_float}'
+    )
+
     channels, length = wav.shape
     if as_float:
         audio_format = 3  # IEEE float
@@ -150,8 +172,15 @@ def encode_ffmpeg(
     samplerate: int,
     bits_per_sample: int = 16
 ):
-    """Save the given `[C, T]` float tensor with ffmpeg, in the format given
-    by the extension of `path` (e.g. flac, which sphn can only decode)."""
+    """
+    Save the given `[C, T]` float tensor with ffmpeg, in the format given
+    by the extension of `path` (e.g. flac, which sphn can only decode).
+    """
+    _logger.debug(
+        'saving audio with .flac '
+        f'sr={samplerate}, bps={bits_per_sample}'
+    )
+
     channels, _ = wav.shape
     input_format = 's16le' if bits_per_sample == 16 else 's32le'
     command = [
@@ -181,11 +210,15 @@ def save_audio(
 ) -> Path:
     """Save audio file, automatically preventing clipping
     if necessary based on the given `clip` strategy.
-    
+
     If the path ends in `.mp3`, this will save as mp3 with the given `bitrate`.
     Use `preset` to set mp3 quality:
         2 for highest quality,
         7 for fastest speed
+
+    wav quality :
+        ``as_float`` = True will save it as 32 bits_per_sample.
+        which is 4 bytes / sample, twice the storage, but lossless.
     """
     import torch
 
@@ -194,7 +227,7 @@ def save_audio(
 
     if isinstance(audio, np.ndarray):
         audio = torch.from_numpy(audio)
-    
+
     audio = prevent_clip(audio, mode=clip)
 
     outpath = Path(outpath)
@@ -204,19 +237,17 @@ def save_audio(
         encode_mp3(audio, outpath, samplerate, bitrate, preset, verbose=True)
 
     elif suffix == ".wav":
-        encode_wav(audio, outpath, samplerate, bits_per_sample=bits_per_sample, as_float=as_float)
+        encode_wav(
+            audio, outpath, samplerate,
+            bits_per_sample=bits_per_sample,
+            as_float=as_float
+        )
 
     elif suffix == ".flac":
-        encode_ffmpeg(audio, outpath, samplerate, bits_per_sample=bits_per_sample)
+        encode_ffmpeg(
+            audio, outpath, samplerate,
+            bits_per_sample=bits_per_sample
+        )
 
     else:
         raise ValueError(f"Invalid suffix for path: {suffix}")
-
-
-if __name__ == "__main__":
-    audio_path = Path("../dataset/mahalini.wav")
-    with audio_path.open("rb") as audio_file:
-        audio_bytes = audio_file.read()
-    print(save_audio(
-        audio_bytes, "test.tmp"
-    ))
