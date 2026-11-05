@@ -304,9 +304,11 @@ def test_compare_pyin():
             transition_min_prob=1e-4,
         )
 
-    res_custom_pyin = custom_pyin()
-    res_librosa_pyin = librosa_pyin()
-    np.testing.assert_equal(res_custom_pyin, res_librosa_pyin)
+    custom_f0, custom_voiced_flag, custom_voiced_probs = custom_pyin()
+    librosa_f0, librosa_voiced_flag, librosa_voiced_probs = librosa_pyin()
+    np.testing.assert_equal(custom_f0, librosa_f0)
+    np.testing.assert_equal(custom_voiced_flag, librosa_voiced_flag)
+    np.testing.assert_equal(custom_voiced_probs, librosa_voiced_probs)
 
     t1 = timeit.timeit(custom_pyin, number=100)
     t2 = timeit.timeit(librosa_pyin, number=100)
@@ -316,8 +318,8 @@ def test_compare_pyin():
 
     print()
     print("="*50)
-    print(f"Frame {res_custom_pyin.shape} ({res_custom_pyin.dtype}) Time:", t1)
-    print(f"Librosa Frame {res_librosa_pyin.shape} ({res_librosa_pyin.dtype}) Time:", t2)
+    print(f"Custom Pyin Time:", t1)
+    print(f"Librosa Pyin Time:", t2)
     print(">> Winner:", winner)
     print("="*50)
 
