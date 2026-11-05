@@ -399,6 +399,7 @@ def mel_to_hertz(mels: float | np.ndarray, mel_scale: str = "htk") -> float | np
 
     return freq
 
+
 def _create_triangular_filter_bank(fft_freqs: np.ndarray, filter_freqs: np.ndarray) -> np.ndarray:
     """
     Creates a triangular filter bank.
@@ -419,6 +420,7 @@ def _create_triangular_filter_bank(fft_freqs: np.ndarray, filter_freqs: np.ndarr
     down_slopes = -slopes[:, :-2] / filter_diff[:-1]
     up_slopes = slopes[:, 2:] / filter_diff[1:]
     return np.maximum(np.zeros(1), np.minimum(down_slopes, up_slopes))
+
 
 def mel_filter_bank(
     num_frequency_bins: int,

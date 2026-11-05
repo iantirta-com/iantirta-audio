@@ -17,7 +17,10 @@ from iantirta.audio.audio_extraction_utils import (
     optimal_fft_length,
     split_long_block_mask,
     uniform_1d,
+    rms as rms_lib,
+    melspectrogram
 )
+from iantirta.audio.extraction_utils import spectrogram
 
 __all__ = [
     "AudioExtraction",
@@ -31,9 +34,9 @@ class AudioFeature:
     """
     arr: np.ndarray
 
-    smooth_distance_ms = 60
-    floor_pct = 5
-    std_threshold_multipler = 0.2
+    smooth_distance_ms: int = 60
+    floor_pct: int = 5
+    std_threshold_multipler: float = 0.2
 
     peak_prominence: float = 0.01
     hop_duration_ms: int = 16
@@ -103,6 +106,7 @@ class AudioExtraction:
     Class that will extract audio features.
     """
     _rms = None
+    _mel_spectrogram = None
 
     def __init__(
         self,
@@ -120,6 +124,16 @@ class AudioExtraction:
         db_range: float | None = None,
     ):
         self.wav = wav
+        *shape, channels, samples = wav.shape
+        self.num_shape = shape
+        self.num_channels = channels
+        self.num_samples = samples
+
+        self.samples = wav.squeeze()
+
+        if self.samples.ndim != 1:
+            raise ValueError(f"Input waveform must have only one dimension, shape is {self.samples.shape}")
+
         self.sr = sr
 
         self.hop_duration_ms = hop_duration_ms
@@ -140,8 +154,8 @@ class AudioExtraction:
     # -----------------------
 
     def get_rms(self) -> RMSFeature:
-        rms = librosa.feature.rms(
-            y=self.wav,
+        rms = rms_lib(
+            self.samples,
             frame_length=self.win_length,
             hop_length=self.hop_length,
         )[0]
@@ -149,22 +163,24 @@ class AudioExtraction:
         return self._rms
 
     def get_mel_spectrogram(self) -> MelSpectrogramFeature:
-        spec = librosa.feature.melspectrogram(
-            y=self.wav,
-            sr=self.sr,
-            n_fft=self.n_fft,
-            win_length=self.win_length,
+        win_function: str = "hann_window"
+        window = spectrogram.window_function(
+            window_length=self.win_length,
+            name=win_function,
+            periodic=True
+        )
+        spec = melspectrogram(
+            self.samples,
+            window=window,
+            sampling_rate=self.sr,
+            fft_length=self.n_fft,
+            frame_length=self.win_length,
             hop_length=self.hop_length,
-            n_mels=self.n_mels,
+            power=2.0,
+            log_mel=None,
+            num_mel_filters=self.n_mels,
             fmin=self.fmin,
             fmax=self.fmax,
-            pad_mode='reflect',
-        )
-        spec = librosa.power_to_db(
-            S=spec,
-            ref=self.reference,
-            amin=self.min_value,
-            top_db=self.db_range
         )
         energy = spec.sum(axis=0)
         self._mel_spectrogram = MelSpectrogramFeature(
