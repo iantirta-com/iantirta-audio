@@ -1,5 +1,6 @@
 import builtins
 import importlib
+from pathlib import Path
 import sys
 import timeit
 
@@ -8,7 +9,7 @@ import numpy as np
 import pytest
 
 import iantirta.audio.audio_extraction_utils as audio_mod
-from iantirta.audio.audio_extraction_utils import frame, melspectrogram, rms, stft
+from iantirta.audio.audio_extraction_utils import frame, melspectrogram, rms, stft, pyin
 from iantirta.audio.extraction_utils import spectrogram
 
 
@@ -235,6 +236,88 @@ def test_compare_make_frames(make_audio):
     print("="*50)
     print(f"Frame {res_frame_1.shape} ({res_frame_1.dtype}) Time:", t1)
     print(f"Librosa Frame {res_librosa_frame.shape} ({res_librosa_frame.dtype}) Time:", t2)
+    print(">> Winner:", winner)
+    print("="*50)
+
+
+def test_compare_pyin():
+    from iantirta.audio import load_audio
+    wav_path = Path(__file__).parent / 'separated.wav'
+
+    sr, c = 16000, 1
+    wav, sr = load_audio(wav_path, sampling_rate=sr, num_channels=c)
+
+    dummy_audio = wav.squeeze()
+
+    hop_duration_ms: int = 16
+    win_duration_ms: int = 64
+    win_length = win_duration_ms * sr // 1000
+    hop_length = hop_duration_ms * sr // 1000
+
+    # fmin: float = 80
+    # fmax: float = 7600
+    fmin = librosa.note_to_hz('C2')
+    fmax = librosa.note_to_hz('C7')
+    num_mel_bins: int = 80
+
+    n_fft = spectrogram.optimal_fft_length(win_length)
+
+    def custom_pyin():
+        return pyin(
+            dummy_audio,
+            sr=sr,
+            fmin=fmin,
+            fmax=fmax,
+            frame_length=win_length,
+            hop_length=hop_length,
+            n_thresholds= 100,
+            beta_parameters= (2, 18),
+            boltzmann_parameter= 2,
+            resolution= 0.1,
+            max_transition_rate= 35.92,
+            switch_prob= 0.01,
+            no_trough_prob= 0.01,
+            fill_na= np.nan,
+            center=True,
+            pad_mode="reflect",
+            transition_min_prob=1e-4,
+        )
+
+    def librosa_pyin():
+        return librosa.pyin(
+            dummy_audio,
+            sr=sr,
+            fmin=fmin,
+            fmax=fmax,
+            frame_length=win_length,
+            hop_length=hop_length,
+            n_thresholds= 100,
+            beta_parameters= (2, 18),
+            boltzmann_parameter= 2,
+            resolution= 0.1,
+            max_transition_rate= 35.92,
+            switch_prob= 0.01,
+            no_trough_prob= 0.01,
+            fill_na= np.nan,
+            center=True,
+            pad_mode="reflect",
+            transition_min_prob=1e-4,
+        )
+
+    res_custom_pyin = custom_pyin()
+    res_librosa_pyin = librosa_pyin()
+    np.testing.assert_equal(res_custom_pyin, res_librosa_pyin)
+
+    t1 = timeit.timeit(custom_pyin, number=100)
+    t2 = timeit.timeit(librosa_pyin, number=100)
+    winner = 'Custom'
+    if t2 < t1:
+        winner = 'Librosa'
+
+    print()
+    print("="*50)
+    print(f"Frame {res_custom_pyin.shape} ({res_custom_pyin.dtype}) Time:", t1)
+    print(f"Librosa Frame {res_librosa_pyin.shape} ({res_librosa_pyin.dtype}) Time:", t2)
     print(">> Winner:", winner)
     print("="*50)
 
