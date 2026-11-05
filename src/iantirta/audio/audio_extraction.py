@@ -21,7 +21,7 @@ from iantirta.audio.audio_extraction_utils import (
 
 __all__ = [
     "AudioExtraction",
-    "detect_audio_activiy",
+    "detect_audio_activity",
 ]
 
 @dataclass(slots=True)
@@ -274,7 +274,7 @@ class AudioExtraction:
         return self._segments
 
 
-def detect_audio_activiy(
+def detect_audio_activity(
     audio_path: str | Path,
     sr: int = 16000
 ) -> AudioExtraction:
