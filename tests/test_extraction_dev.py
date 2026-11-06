@@ -6,8 +6,9 @@ import numpy as np
 import pytest
 import scipy.fft
 
-from iantirta.audio.audio_extraction_utils import stft, frame, _cumulative_mean_normalized_difference
+from iantirta.audio.audio_extraction_utils import stft, frame, _cumulative_mean_normalized_difference, fast_merge_lower_duration, mask_merge_lower_duration
 from iantirta.audio.extraction_utils import spectrogram
+from iantirta.audio.audio_extraction import AudioExtraction
 
 
 @pytest.mark.manual
@@ -171,6 +172,7 @@ try:
 
 except:
     pass
+
 
 
 @pytest.mark.manual

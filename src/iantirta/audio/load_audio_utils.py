@@ -254,12 +254,15 @@ def load_audio(
 
             logger.debug('load audio using librosa')
 
-            return librosa.load(
+            wav, src_sr = librosa.load(
                 BytesIO(audio_source) if isinstance(audio_source, bytes)
                 else audio_source,
                 sr=sampling_rate,
                 mono=num_channels==1
             )
+            if wav.ndim == 1:
+                wav = np.expand_dims(wav, axis=0)
+            return wav, sampling_rate if sampling_rate is not None else src_sr
         except Exception:
             from ._audio import AudioLoader
             
@@ -269,3 +272,16 @@ def load_audio(
             ).numpy(), sampling_rate if sampling_rate is not None else audio_samples.samplerate()
 
     raise ValueError()
+
+
+def _load_audio_torchcodec():
+    pass
+
+def _load_audio_librosa():
+    pass
+
+def _load_audio_torchaudio():
+    pass
+
+def _load_audio_audioloader():
+    pass

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import numpy as np
 
 from iantirta.audio.extraction_utils import sequence, spectrogram
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
+    from numpy.typing import DTypeLike, NDArray
 
 
 def get_mask_starts_ends(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -21,6 +21,7 @@ def get_mask_starts_ends(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         in frame indices
     :rtype: tuple[np.ndarray, np.ndarray]
     """
+    # Pad is so that array slicing move forward by 1
     diffs = np.diff(np.pad(
         arr.astype(int),
         pad_width=1,
@@ -70,8 +71,7 @@ def mask_uniform(
     merge_frame = ms2frame(dist_ms, hop_duration_ms=hop_duration_ms)
 
     for s, e in zip(ends[:-1], starts[1:]): # i.e. the end of one True block, the start of the next True block
-        dist = e - s
-        if dist <= merge_frame:
+        if (e - s) <= merge_frame:
             arr[s:e] = True
 
     return arr
@@ -88,9 +88,7 @@ def mask_delete(
     delete_frame = ms2frame(delete_ms, hop_duration_ms=hop_duration_ms)
 
     for s, e in zip(starts, ends):
-        dur = e - s
-
-        if dur <= delete_frame:
+        if (e - s) <= delete_frame:
             arr[s:e] = False
 
     return arr
@@ -101,69 +99,60 @@ def mask_merge_lower_duration(
     merge_ms: int = 3000,
     *,
     hop_duration_ms: int,
-) -> np.ndarray:
+):
     """ Any mask frame `lower than or equal` the threshold ms, would be merged to the nearest mask """
-
+    merge_frame = ms2frame(merge_ms, hop_duration_ms=hop_duration_ms)
+    
     while True:
-
         starts, ends = get_mask_starts_ends(arr)
-        merge_frame = ms2frame(merge_ms, hop_duration_ms=hop_duration_ms)
-
-        if len(starts) == 0:
+        
+        # If 0 or 1 segment exists, there is nothing to merge
+        if len(starts) <= 1:
             break
 
-        short_segments = []
-        for i, (s, e) in enumerate(zip(starts, ends)):
-            dur = e - s
-            if dur <= merge_frame:
-                short_segments.append((i, s, e))
+        durations = ends - starts
+        short_mask = durations <= merge_frame
 
-        if not short_segments:
+        if not np.any(short_mask):
             break
 
-        assert len(starts) > 1
+        prev_ends = np.concatenate(([float('-inf')], ends[:-1]))
+        next_starts = np.concatenate((starts[1:], [float('inf')]))
 
-        for i, s, e in short_segments:
-            next_start = starts[i+1] if i < len(starts) - 1 else None
-            prev_end = ends[i-1] if i > 0 else None
+        prev_gaps = starts - prev_ends
+        next_gaps = next_starts - ends
 
-            prev_gap = (s - prev_end) if prev_end is not None else float("inf")
-            next_gap = (next_start - e) if next_start is not None else float("inf")
+        prev_durs = np.concatenate(([float('inf')], durations[:-1]))
+        next_durs = np.concatenate((durations[1:], [float('inf')]))
 
-            if prev_gap < next_gap:
-                arr[prev_end:s] = True
+        # Condition 1: Merge left (prev_gap < next_gap)
+        merge_left = short_mask & (prev_gaps < next_gaps)
 
-            elif next_gap < prev_gap:
-                arr[e:next_start] = True
+        # Condition 2: Merge right (next_gap < prev_gap)
+        merge_right = short_mask & (next_gaps < prev_gaps)
 
-            elif next_gap == prev_gap:
-                next_end = ends[i+1] if i < len(ends) - 1 else None
-                next_dur = (
-                    (next_end - next_start)
-                    if (
-                        next_start is not None
-                        and next_end is not None
-                    )
-                    else float("inf")
-                )
+        # Condition 3: Tie-breaker (prev_gap == next_gap) -> merge to the longer adjacent segment
+        tie_mask = short_mask & (prev_gaps == next_gaps)
+        merge_left_tie = tie_mask & (prev_durs >= next_durs)
+        merge_right_tie = tie_mask & (next_durs > prev_durs)
 
-                prev_start = starts[i-1] if i > 0 else None
-                prev_dur = (
-                    (prev_end - prev_start)
-                    if (
-                        prev_start is not None
-                        and prev_end is not None
-                    ) else float("inf")
-                )
+        # Final boolean arrays of which direction each segment should merge
+        final_merge_left = merge_left | merge_left_tie
+        final_merge_right = merge_right | merge_right_tie
 
-                if next_dur < prev_dur:
-                    arr[e:next_start] = True
+        # To avoid index out-of-bounds on the first segment merging left
+        # (which has prev_end == -inf), we ensure final_merge_left is False at index 0.
+        # Likewise for final_merge_right at the last index.
+        final_merge_left[0] = False
+        final_merge_right[-1] = False
 
-                else:
-                    arr[prev_end:s] = True
-
-            else:
-                raise RuntimeError("Not sure why this happen")
+        left_indices = np.where(final_merge_left)[0]
+        for i in left_indices:
+            arr[ends[i-1]:starts[i]] = True
+            
+        right_indices = np.where(final_merge_right)[0]
+        for i in right_indices:
+            arr[ends[i]:starts[i+1]] = True
 
     return arr
 
@@ -590,6 +579,114 @@ def tiny(
     tiny: np.floating[Any] = np.finfo(dtype).tiny
     return tiny
 
+
+def dtype_c2r(
+    d: DTypeLike, *, default: type[np.floating] | None = np.float32
+) -> np.dtype[np.floating]:
+    """
+    Find the real numpy dtype corresponding to a complex dtype.
+
+    This is used to maintain numerical precision and memory footprint
+    when constructing real arrays from complex-valued data
+    (e.g. in an inverse Fourier transform).
+
+    A `complex64` (single-precision) type maps to `float32`,
+    while a `complex128` (double-precision) maps to `float64`.
+
+    Parameters
+    ----------
+    d : np.dtype
+        The complex-valued dtype to convert to real.
+        If ``d`` is a real (float) type already, it will be returned.
+    default : np.dtype, optional
+        The default real target type, if ``d`` does not match a
+        known dtype
+
+    Returns
+    -------
+    d_r : np.dtype
+        The real dtype
+
+    See Also
+    --------
+    dtype_r2c
+    numpy.dtype
+
+    Examples
+    --------
+    >>> dtype_r2c(np.complex64)
+    dtype('float32')
+
+    >>> dtype_r2c(np.float32)
+    dtype('float32')
+
+    >>> dtype_r2c(np.int16)
+    dtype('float32')
+
+    >>> dtype_r2c(np.complex128)
+    dtype('float64')
+    """
+    mapping: dict[np.dtype[np.complexfloating], type[np.floating]] = {
+        np.dtype(np.complex64): np.float32,
+        np.dtype(np.complex128): np.float64,
+    }
+
+    # If we're given a real type already, return it
+    dt: np.dtype = np.dtype(d)
+    if dt.kind == "f":
+        return dt
+
+    # Otherwise, try to map the dtype.
+    # If no match is found, return the default.
+    return np.dtype(mapping.get(dt, default))
+
+
+@overload
+def abs2(x: np.ndarray, dtype: DTypeLike | None = ...) -> np.ndarray: ...
+
+
+@overload
+def abs2(x, dtype: DTypeLike | None = ...) -> np.floating: ...
+
+
+def abs2(
+    x: np.ndarray, dtype: DTypeLike | None = None
+) -> np.ndarray | np.floating:
+    """
+    Compute the squared magnitude of a real or complex array.
+
+    This function is equivalent to calling `np.abs(x)**2` but it
+    is slightly more efficient.
+
+    Parameters
+    ----------
+    x : np.ndarray or scalar, real or complex typed
+        The input data, either real (float32, float64) or complex (complex64, complex128) typed
+    dtype : np.dtype, optional
+        The data type of the output array.
+        If not provided, it will be inferred from `x`
+
+    Returns
+    -------
+    p : np.ndarray or scale, real
+        squared magnitude of `x`
+    """
+    if np.iscomplexobj(x):
+        # suppress type check, mypy doesn't like vectorization
+        if dtype is None:
+            dtype = dtype_c2r(np.asarray(x).dtype)
+        y: np.ndarray = np.empty_like(x, dtype=dtype)
+
+        if _cabs2 is None:
+            np.square(x.real, out=y)
+            y += np.square(x.imag)
+        else:
+            _cabs2(x, y)
+        return y
+    else:
+        # suppress type check, mypy doesn't know this is real
+        return np.square(x, dtype=dtype)
+
 # ------------------
 # API Method
 # ------------------
@@ -738,6 +835,7 @@ def melspectrogram(
 
 def autocorrelate(
     waveform: np.ndarray,
+    *,
     max_size: int | None = None,
     axis: int = -1
 ):
@@ -770,7 +868,7 @@ def autocorrelate(
     n_pad = scipy.fft.next_fast_len(2 * waveform.shape[axis] - 1, real=True)
 
     # Compute the power spectrum along the chosen axis
-    powspec = (scipy.fft.rfft(waveform, n=n_pad, axis=axis))**2
+    powspec = abs2(scipy.fft.rfft(waveform, n=n_pad, axis=axis))
 
     # Convert back to time domain
     autocorr = scipy.fft.irfft(powspec, n=n_pad, axis=axis)
@@ -995,6 +1093,9 @@ except ImportError as e:
 
         return out.swapaxes(-1, axis)
 
+
+    _cabs2 = None
+
 else:
 
     @numba.stencil  # type: ignore
@@ -1111,3 +1212,11 @@ else:
         lmini[..., -1] = xi[..., -1] < xi[..., -2]
 
         return lmin
+
+
+    @numba.vectorize(
+        nopython=True, cache=True, identity=0
+    )  # type: ignore
+    def _cabs2(x):  # pragma: no cover
+        """Efficiently compute abs2 on complex inputs"""
+        return x.real**2 + x.imag**2

@@ -1,15 +1,23 @@
 import builtins
 import importlib
-from pathlib import Path
 import sys
 import timeit
+from pathlib import Path
 
 import librosa
 import numpy as np
 import pytest
 
 import iantirta.audio.audio_extraction_utils as audio_mod
-from iantirta.audio.audio_extraction_utils import frame, melspectrogram, rms, stft, pyin
+from iantirta.audio.audio_extraction_utils import (
+    _cumulative_mean_normalized_difference,
+    frame,
+    melspectrogram,
+    pyin,
+    rms,
+    stft,
+    autocorrelate,
+)
 from iantirta.audio.extraction_utils import spectrogram
 
 
@@ -240,6 +248,40 @@ def test_compare_make_frames(make_audio):
     print("="*50)
 
 
+def test_compare_autocorrelate(make_audio):
+    from iantirta.audio import load_audio
+    wav_path = Path(__file__).parent / 'separated.wav'
+
+    sr, c = 16000, 1
+    wav, sr = load_audio(wav_path, sampling_rate=sr, num_channels=c)
+
+    dummy_audio = wav.squeeze()
+
+    hop_duration_ms: int = 16
+    win_duration_ms: int = 64
+    win_length = win_duration_ms * sr // 1000
+    hop_length = hop_duration_ms * sr // 1000
+
+    fmin = librosa.note_to_hz('C2')
+
+    y = dummy_audio
+
+    padding = [(0, 0) for _ in range(y.ndim)]
+    padding[-1] = (int(win_length // 2), int(win_length // 2))
+    y = np.pad(y, padding, mode='reflect')
+    y_frames = frame(dummy_audio, frame_length=win_length, hop_length=hop_length)
+
+    max_period = min(int(np.ceil(sr / fmin)), win_length - 1)
+
+    custom_autocorrelate = autocorrelate(y_frames, max_size=max_period + 1, axis=-2)
+    librosa_autocorrelate = librosa.core.audio.autocorrelate(
+        y_frames, max_size=max_period + 1, axis=-2
+    )
+
+    np.testing.assert_equal(custom_autocorrelate, librosa_autocorrelate)
+    # What about non-numba implementation
+
+
 def test_compare_pyin():
     from iantirta.audio import load_audio
     wav_path = Path(__file__).parent / 'separated.wav'
@@ -261,6 +303,26 @@ def test_compare_pyin():
     num_mel_bins: int = 80
 
     n_fft = spectrogram.optimal_fft_length(win_length)
+
+    # Test Cumulative
+    y = dummy_audio
+
+    padding = [(0, 0) for _ in range(y.ndim)]
+    padding[-1] = (int(win_length // 2), int(win_length // 2))
+    y = np.pad(y, padding, mode='reflect')
+    y_frames = frame(dummy_audio, frame_length=win_length, hop_length=hop_length)
+
+    min_period = int(np.floor(sr / fmax))
+    max_period = min(int(np.ceil(sr / fmin)), win_length - 1)
+
+    custom_yin_frames = _cumulative_mean_normalized_difference(
+        y_frames, min_period, max_period
+    )
+    librosa_yin_frames = librosa.core.pitch._cumulative_mean_normalized_difference(
+        y_frames, min_period, max_period
+    )
+
+    np.testing.assert_equal(custom_yin_frames, librosa_yin_frames)
 
     def custom_pyin():
         return pyin(
@@ -306,12 +368,13 @@ def test_compare_pyin():
 
     custom_f0, custom_voiced_flag, custom_voiced_probs = custom_pyin()
     librosa_f0, librosa_voiced_flag, librosa_voiced_probs = librosa_pyin()
+
     np.testing.assert_equal(custom_f0, librosa_f0)
     np.testing.assert_equal(custom_voiced_flag, librosa_voiced_flag)
     np.testing.assert_equal(custom_voiced_probs, librosa_voiced_probs)
 
-    t1 = timeit.timeit(custom_pyin, number=100)
-    t2 = timeit.timeit(librosa_pyin, number=100)
+    t1 = timeit.timeit(custom_pyin, number=1)
+    t2 = timeit.timeit(librosa_pyin, number=1)
     winner = 'Custom'
     if t2 < t1:
         winner = 'Librosa'
@@ -329,23 +392,32 @@ def test_compare_numba_vs_numpy_fallback(monkeypatch):
     dummy_data = rng.random((313, 199))
     axis = 0
 
-    numba_funcs = [
-        'localmin',
-        '_parabolic_interpolation',
-    ]
+    numba_funcs = {
+        'localmin': {
+            'x': dummy_data,
+            'axis': axis
+        },
+        '_parabolic_interpolation': {
+            'x': dummy_data,
+            'axis': axis
+        },
+        'abs2': {
+            'x': dummy_data.astype(np.complex128)
+        },
+    }
     numba_results = {}
     fallback_results = {}
     numba_times = {}
     fallback_times = {}
 
     importlib.reload(audio_mod)
-    for name in numba_funcs:
+    for name, params in numba_funcs.items():
         func = getattr(audio_mod, name)
 
-        _ = func(dummy_data, axis=axis)
+        _ = func(**params)
 
-        numba_results[name] = func(dummy_data, axis=axis)
-        numba_times[name] = timeit.timeit(lambda: func(dummy_data, axis=axis), number=100)
+        numba_results[name] = func(**params)
+        numba_times[name] = timeit.timeit(lambda: func(**params), number=100)
 
     original_import = builtins.__import__
     def mock_import(name, *args, **kwargs):
@@ -357,10 +429,10 @@ def test_compare_numba_vs_numpy_fallback(monkeypatch):
     monkeypatch.delitem(sys.modules, "numba", raising=False)
     importlib.reload(audio_mod)
 
-    for name in numba_funcs:
+    for name, params in numba_funcs.items():
         func = getattr(audio_mod, name)
-        fallback_results[name] = func(dummy_data, axis=axis)
-        fallback_times[name] = timeit.timeit(lambda: func(dummy_data, axis=axis), number=100)
+        fallback_results[name] = func(**params)
+        fallback_times[name] = timeit.timeit(lambda: func(**params), number=100)
 
     print("\n" + "=" * 60)
     print(f"{'Function':<30} | {'Numba (s)':<12} | {'Fallback (s)':<12} | {'Winner':<10}")

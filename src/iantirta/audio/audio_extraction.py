@@ -18,7 +18,9 @@ from iantirta.audio.audio_extraction_utils import (
     split_long_block_mask,
     uniform_1d,
     rms as rms_lib,
-    melspectrogram
+    melspectrogram,
+    pyin,
+    ms2frame
 )
 from iantirta.audio.extraction_utils import spectrogram
 
@@ -105,8 +107,14 @@ class AudioExtraction:
     """
     Class that will extract audio features.
     """
+    _f0 = None
+    _voiced_flag = None
+    _refined_voiced_flag = None
+    _voiced_probs = None
     _rms = None
     _mel_spectrogram = None
+    _segments = None
+    _times = None
 
     def __init__(
         self,
@@ -152,6 +160,82 @@ class AudioExtraction:
     # -----------------------
     # Audio Method Process
     # -----------------------
+
+    def get_pyin(self):
+        f0, voiced_flag, voiced_probs = pyin(
+            self.samples,
+            sr=self.sr,
+            fmin=np.float64(65.40639132514966),
+            fmax=np.float64(2093.004522404789),
+            frame_length=self.win_length,
+            hop_length=self.hop_length,
+            n_thresholds= 100,
+            beta_parameters= (2, 18),
+            boltzmann_parameter= 2,
+            resolution= 0.1,
+            max_transition_rate= 35.92,
+            switch_prob= 0.01,
+            no_trough_prob= 0.01,
+            fill_na= np.nan,
+            center=True,
+            pad_mode="reflect",
+            transition_min_prob=1e-4,
+        )
+
+        self._f0 = f0
+        self._voiced_flag = voiced_flag
+        self._voiced_probs = voiced_probs
+
+        return f0, voiced_flag, voiced_probs
+
+    def get_refined_voiced_flag(self):
+        arr = self.voiced_flag.copy()
+
+        arr = mask_uniform(arr, hop_duration_ms=self.hop_duration_ms)
+        arr = mask_delete(arr, hop_duration_ms=self.hop_duration_ms)
+        arr = mask_merge_lower_duration(arr, hop_duration_ms=self.hop_duration_ms)
+        
+        max_block_ms: int = 10000
+        min_block_ms: int = 1000
+        max_frame = ms2frame(max_block_ms, hop_duration_ms=self.hop_duration_ms)
+        min_frame = ms2frame(min_block_ms, hop_duration_ms=self.hop_duration_ms)
+        voiced_probs = self.voiced_probs
+
+        while True:
+            starts, ends = get_mask_starts_ends(arr)
+
+            if len(starts) == 0:
+                break
+
+            durations = ends - starts
+            long_blocks = np.where(durations >= max_frame)[0]
+
+            if len(long_blocks) == 0:
+                break
+
+            split_occurred = False
+            for idx in long_blocks:
+                s = starts[idx]
+                e = ends[idx]
+
+                valid_start = s + min_frame
+                valid_end = e - min_frame
+
+                if valid_start >= valid_end:
+                    # Segment is longer than max_frame, but not long enough to split into two valid min_frame chunks
+                    continue
+
+                valid_probs = voiced_probs[valid_start:valid_end]
+                local_min_idx = np.argmin(valid_probs)
+                global_min_idx = valid_start + local_min_idx
+                arr[global_min_idx] = False
+                split_occurred = True
+
+            if not split_occurred:
+                break
+
+        self._refined_voiced_flag = arr
+        return self._refined_voiced_flag
 
     def get_rms(self) -> RMSFeature:
         rms = rms_lib(
@@ -223,14 +307,13 @@ class AudioExtraction:
         )
         return self._activity_mask
 
-
     def get_audio_segments(self) -> list[AudioSegment]:
         """
         Method that is used to get audio activity segments.
         """
         audio_segments = []
 
-        starts, ends = get_mask_starts_ends(self.activity_mask)
+        starts, ends = get_mask_starts_ends(self.refined_voiced_flag)
 
         for s, e in zip(starts, ends):
             audio_segments.append(AudioSegment(
@@ -255,7 +338,31 @@ class AudioExtraction:
                 n_fft=self.n_fft,
             )
         return self._times
-    
+
+    @property
+    def f0(self):
+        if self._f0 is None:
+            self.get_pyin()
+        return self._f0
+
+    @property
+    def voiced_flag(self):
+        if self._voiced_flag is None:
+            self.get_pyin()
+        return self._voiced_flag
+
+    @property
+    def voiced_probs(self):
+        if self._voiced_probs is None:
+            self.get_pyin()
+        return self._voiced_probs
+
+    @property
+    def refined_voiced_flag(self):
+        if self._refined_voiced_flag is None:
+            self.get_refined_voiced_flag()
+        return self._refined_voiced_flag
+
     @property
     def rms(self) -> RMSFeature:
         if self._rms is None:
