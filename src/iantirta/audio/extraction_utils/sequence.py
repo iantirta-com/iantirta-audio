@@ -169,7 +169,7 @@ def optional_jit(func):
 
     return jit(nopython=True, cache=True)(func)
 
-@jit(nopython=True, cache=True)  # type: ignore
+@optional_jit  # type: ignore
 def _viterbi(
     log_prob: np.ndarray,
     log_trans: np.ndarray,
