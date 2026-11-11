@@ -6,9 +6,15 @@ import numpy as np
 import pytest
 import scipy.fft
 
-from iantirta.audio.audio_extraction_utils import stft, frame, _cumulative_mean_normalized_difference, fast_merge_lower_duration, mask_merge_lower_duration
-from iantirta.audio.extraction_utils import spectrogram
 from iantirta.audio.audio_extraction import AudioExtraction
+from iantirta.audio.audio_extraction_utils import (
+    _cumulative_mean_normalized_difference,
+    fast_merge_lower_duration,
+    frame,
+    mask_merge_lower_duration,
+    stft,
+)
+from iantirta.audio.extraction_utils import spectrogram
 
 
 @pytest.mark.manual

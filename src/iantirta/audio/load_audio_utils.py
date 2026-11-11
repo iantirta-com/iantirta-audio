@@ -58,7 +58,7 @@ def _is_torchcodec_available() -> bool:
 def _fetch_audio_bytes(url: str, timeout: float | None = 10.0) -> bytes:
     """Fetch audio bytes from a URL."""
     import requests
-    response = requests.get(url, follow_redirects=True, timeout=timeout)
+    response: requests.Response = requests.get(url, follow_redirects=True, timeout=timeout)
     response.raise_for_status()
     return response.content
 
@@ -87,9 +87,11 @@ def resolve_audio_from_source(source: str):
 
 
 def get_file_type_from_source(source: str) -> str:
-    """Best-effort format token from the source *string* — the file extension (paths and URLs) or
-        the media subtype (`data:` URIs) — without resolving or decoding it. Returns None when the
-        string carries no hint, e.g. a raw base64 payload."""
+    """
+    Best-effort format token from the source *string* — the file extension (paths and URLs) or
+    the media subtype (`data:` URIs) — without resolving or decoding it. Returns None when the
+    string carries no hint, e.g. a raw base64 payload.
+    """
     if source.startswith("data:"):
         media_type = source[len("data:") :].split(",", 1)[0].split(";", 1)[0]
         return media_type.rpartition("/")[2].removeprefix("x-") or None
@@ -183,6 +185,16 @@ def load_audio(
     num_channels: int | None = None,
     backend: str = "auto",
 ) -> tuple[np.ndarray, int]:
+    """
+    Method that will load given audio into ``np.ndarray`` and
+    ``int`` as sample rate.
+
+    Backend support:
+        1. torchcodec
+        2. torchaudio (library deprecated)
+        3. custom built-in iantirta-audio
+        4. librosa
+    """
 
     if isinstance(audio, np.ndarray):
         return audio
@@ -195,14 +207,14 @@ def load_audio(
 
     audio = str(audio)
     filetype = get_file_type_from_source(audio)
-    logger.debug(f'load audio filetype: {filetype}')
+    logger.debug(f'load audio {audio[-20:]} filetype: {filetype}')
 
     audio_source = resolve_audio_from_source(audio)
 
     use_torchcodec = False
     if backend == "torchcodec" or (backend == "auto" and filetype in TORCHCODEC_ONLY_FILETYPES):
         use_torchcodec = _is_torchcodec_available()
-    logger.debug(f'load audio torchcodec: {use_torchcodec}')
+    logger.debug(f'load audio {audio[-20:]} torchcodec: {use_torchcodec}')
 
     if isinstance(audio_source, bytes) and filetype is None and not use_torchcodec:
         try:
@@ -212,76 +224,80 @@ def load_audio(
             filetype = None
 
     if use_torchcodec:
-        from torchcodec.decoders import AudioDecoder
-
-        logger.debug('load audio using torchcodec')
-
-        audio_samples = AudioDecoder(
-            audio_source,
-            sample_rate=sampling_rate,
-            num_channels=num_channels
-        ).get_all_samples()
-        return audio_samples.data.numpy(), sampling_rate if sampling_rate is not None else audio_samples.sample_rate
+        return _load_audio_torchcodec(audio_source, sampling_rate, num_channels)
 
     elif not use_torchcodec and filetype in TORCHCODEC_ONLY_FILETYPES:
-        from ._audio import AudioLoader
-
-        logger.debug('load audio using AudioLoader')
-        audio_samples = AudioLoader(audio_source)
-        return audio_samples.read(
-            streams=0, sampling_rate=sampling_rate, num_channels=num_channels
-        ).numpy(), sampling_rate if sampling_rate is not None else audio_samples.samplerate()
+        return _load_audio_audioloader(audio_source, sampling_rate, num_channels)
 
     else:
-        if backend == "torchaudio": # Specific only, i think its already deprecated
-            from io import BytesIO
+        if backend == "torchaudio":  # Specific only, i think its already deprecated
+            return _load_audio_torchaudio(audio_source, sampling_rate, num_channels)
 
-            import torchaudio
-
-            logger.debug('load audio using torchaudio')
-            wav, src_sr = torchaudio.load(BytesIO(audio_source) if isinstance(audio_source, bytes) else audio_source)
-
-            if sampling_rate and sampling_rate != src_sr:
-                wav = torchaudio.functional.resample(wav, orig_freq=src_sr, new_freq=sampling_rate)
-
-            if num_channels == 1:
-                wav = wav.mean(dim=0) # To mono
-
-            return wav.numpy().astype(np.float32), sampling_rate if sampling_rate is not None else src_sr
+        elif backend == "audioloader":
+            return _load_audio_audioloader(audio_source, sampling_rate, num_channels)
 
         try:
-            import librosa
+            return _load_audio_librosa(audio_source, sampling_rate, num_channels)
 
-            logger.debug('load audio using librosa')
-
-            wav, src_sr = librosa.load(
-                BytesIO(audio_source) if isinstance(audio_source, bytes)
-                else audio_source,
-                sr=sampling_rate,
-                mono=num_channels==1
-            )
-            if wav.ndim == 1:
-                wav = np.expand_dims(wav, axis=0)
-            return wav, sampling_rate if sampling_rate is not None else src_sr
         except Exception:
-            from ._audio import AudioLoader
-            
-            audio_samples = AudioLoader(audio_source)
-            return audio_samples.read(
-                streams=0, sampling_rate=sampling_rate, num_channels=num_channels
-            ).numpy(), sampling_rate if sampling_rate is not None else audio_samples.samplerate()
-
-    raise ValueError()
+            return _load_audio_audioloader(audio_source, sampling_rate, num_channels)
 
 
-def _load_audio_torchcodec():
-    pass
+def _load_audio_torchcodec(audio_source, sampling_rate, num_channels):
+    from torchcodec.decoders import AudioDecoder
 
-def _load_audio_librosa():
-    pass
+    logger.debug('load audio using torchcodec')
 
-def _load_audio_torchaudio():
-    pass
+    audio_samples = AudioDecoder(
+        audio_source,
+        sample_rate=sampling_rate,
+        num_channels=num_channels
+    ).get_all_samples()
+    return audio_samples.data.numpy(), sampling_rate if sampling_rate is not None else audio_samples.sample_rate
 
-def _load_audio_audioloader():
-    pass
+
+def _load_audio_librosa(audio_source, sampling_rate, num_channels):
+    from io import BytesIO
+
+    import librosa
+
+    logger.debug('load audio using librosa')
+
+    wav, src_sr = librosa.load(
+        BytesIO(audio_source) if isinstance(audio_source, bytes)
+        else audio_source,
+        sr=sampling_rate,
+        mono=num_channels==1
+    )
+
+    if wav.ndim == 1:
+        wav = np.expand_dims(wav, axis=0)
+
+    return wav, sampling_rate if sampling_rate is not None else src_sr
+
+
+def _load_audio_torchaudio(audio_source, sampling_rate, num_channels):
+    from io import BytesIO
+
+    import torchaudio
+
+    logger.debug('load audio using torchaudio')
+    wav, src_sr = torchaudio.load(BytesIO(audio_source) if isinstance(audio_source, bytes) else audio_source)
+
+    if sampling_rate and sampling_rate != src_sr:
+        wav = torchaudio.functional.resample(wav, orig_freq=src_sr, new_freq=sampling_rate)
+
+    if num_channels == 1:
+        wav = wav.mean(dim=0) # To mono
+
+    return wav.numpy().astype(np.float32), sampling_rate if sampling_rate is not None else src_sr
+
+
+def _load_audio_audioloader(audio_source, sampling_rate, num_channels):
+    from ._audio import AudioLoader
+
+    logger.debug('load audio using AudioLoader')
+    audio_samples = AudioLoader(audio_source)
+    return audio_samples.read(
+        streams=0, sampling_rate=sampling_rate, num_channels=num_channels
+    ).numpy(), sampling_rate if sampling_rate is not None else audio_samples.samplerate()

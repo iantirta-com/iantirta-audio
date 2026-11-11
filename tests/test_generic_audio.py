@@ -1,17 +1,44 @@
 
 import pytest
-from iantirta.audio._audio import slice_np
+
+from iantirta.audio._audio import slice_audio
 
 
-def test_slice_np(make_audio):
+def test_slice_audio_numpy(make_audio):
+    """
+    test to slice audio from numpy.
+    """
     sr = 16000
     channels = 1
-    dummy_audio = make_audio(sr=sr, channels=channels)
+    start = 1.0
+    end = 2.0
+    duration = 5.0
+    dummy_audio = make_audio(sr=sr, channels=channels, duration=duration)
 
-    achunk = slice_np(dummy_audio, 1.0, 2.0, sr=sr)
+    achunk = slice_audio(dummy_audio, start, end, sr=sr)
     C, T = achunk.shape
     assert C == channels
-    assert T == (2.0 - 1.0) * sr
+    assert T == (end - start) * sr
+
+
+def test_slice_audio_torch(make_audio):
+    """
+    test to slice audio from torch.
+    """
+    sr = 16000
+    channels = 1
+    start = 1.0
+    end = 2.0
+    duration = 5.0
+    dummy_audio = make_audio(sr=sr, channels=channels, duration=duration)
+
+    import torch
+    dummy_audio = torch.from_numpy(dummy_audio)
+
+    achunk = slice_audio(dummy_audio, start, end, sr=sr)
+    C, T = achunk.shape
+    assert C == channels
+    assert T == (end - start) * sr
 
 
 if __name__ == "__main__":

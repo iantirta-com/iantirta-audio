@@ -11,12 +11,12 @@ import pytest
 import iantirta.audio.audio_extraction_utils as audio_mod
 from iantirta.audio.audio_extraction_utils import (
     _cumulative_mean_normalized_difference,
+    autocorrelate,
     frame,
     melspectrogram,
     pyin,
     rms,
     stft,
-    autocorrelate,
 )
 from iantirta.audio.extraction_utils import spectrogram
 

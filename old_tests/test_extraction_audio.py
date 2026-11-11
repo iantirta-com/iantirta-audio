@@ -7,6 +7,9 @@ from iantirta.audio.audio_extraction import AudioExtraction
 
 
 def test_audio_extraction_all():
+    """
+    test audio extraction needed for making `audio_segments`
+    """
     from iantirta.audio import load_audio
     wav_path = Path(__file__).parent / 'separated.wav'
 

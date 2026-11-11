@@ -1,6 +1,4 @@
 
-
-
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,14 +12,14 @@ from iantirta.audio.audio_extraction_utils import (
     mask_merge_forward,
     mask_merge_lower_duration,
     mask_uniform,
+    melspectrogram,
+    ms2frame,
     optimal_fft_length,
+    pyin,
     split_long_block_mask,
     uniform_1d,
-    rms as rms_lib,
-    melspectrogram,
-    pyin,
-    ms2frame
 )
+from iantirta.audio.audio_extraction_utils import rms as rms_lib
 from iantirta.audio.extraction_utils import spectrogram
 
 __all__ = [
@@ -165,8 +163,8 @@ class AudioExtraction:
         f0, voiced_flag, voiced_probs = pyin(
             self.samples,
             sr=self.sr,
-            fmin=np.float64(65.40639132514966),
-            fmax=np.float64(2093.004522404789),
+            fmin=np.float64(65.40639132514966),  # C2
+            fmax=np.float64(2093.004522404789),  # C7
             frame_length=self.win_length,
             hop_length=self.hop_length,
             n_thresholds= 100,

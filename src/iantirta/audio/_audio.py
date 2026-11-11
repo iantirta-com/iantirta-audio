@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -11,6 +12,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import numpy as np
     import torch
+
+
+_logger = logging.getLogger(__name__)
 
 
 __all__ = [
@@ -53,7 +57,7 @@ class AudioLoader:
     _metadata: dict[str, Any] | None = None
 
     _temp_file: str | None = field(default=None, init=False, repr=False)
-    
+
     def __post_init__(self, *args, **kwargs):
         # If input is raw bytes (e.g. from URL or base64), dump to a temp file 
         # so ffprobe and ffmpeg can read it as a valid media stream.
@@ -130,6 +134,15 @@ class AudioLoader:
         """
         import numpy as np
         import torch
+
+        _logger.debug(
+            "AudioLoader.read, params: "
+            f"start_seconds={start_seconds} "
+            f"stop_seconds={stop_seconds} "
+            f"streams={streams} "
+            f"sampling_rate={sampling_rate} "
+            f"num_channels={num_channels} "
+        )
 
         streams = np.array(range(len(self)))[streams]
         single = not isinstance(streams, np.ndarray)

@@ -11,7 +11,7 @@ def make_audio():
         sr: int = 16000,
         channels: int = 1,
         duration: float = 5.0,
-    ):
+    ) -> np.ndarray:
         samples = np.arange(
             round(sr * duration),
             dtype=np.float32,
@@ -45,16 +45,8 @@ def mp4_path(base_dir_tests):
 
 @pytest.fixture
 def wav_path(request, base_dir_tests):
-    is_manual = request.node.get_closest_marker("manual") is not None
-    if is_manual:
-        return base_dir_tests / 'test.wav'
-    else:
-        return base_dir_tests / 'dummy_test.wav'
+    return base_dir_tests / 'test.wav'
 
-
-def test_dummy_audio(dummy_audio):
-    pass
-    
 
 if __name__ == "__main__":
     import sys
