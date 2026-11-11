@@ -86,7 +86,7 @@ class TestLoadAudio:
         # Channels and Sample rate
         wav1, sr1, wav2, sr2 = self.load_audio_video_and_test_valid(
             mp4_path, wav_path,
-            sample_rate=sr,
+            sampling_rate=sr,
             num_channels=channels,
             **kwargs,
         )
@@ -98,42 +98,28 @@ class TestLoadAudio:
 
         assert channels == C1 == C2
 
+    def test_load_audio_torchaudio(self, wav_path):
+        wav, sr = load_audio_utils._load_audio_torchaudio(wav_path)
+        self.assert_audio_valid(wav)
 
-# @pytest.mark.manual
-# def test_load_audio_compare(mp4_path, wav_path):
-#     wav, sr = load_audio(mp4_path)
-#     wav2, sr2 = load_audio(wav_path)
+        *shape, C, T = wav.shape
 
-#     assert wav.shape == wav2.shape
-#     assert sr == sr2
+    @pytest.mark.parametrize(
+        "channels",
+        [
+            1, 2
+        ],
+    )
+    def test_load_audio_torchaudio_w_channels(self, wav_path, channels: int):
+        wav, sr = load_audio_utils._load_audio_torchaudio(
+            wav_path,
+            num_channels=channels,
+        )
+        self.assert_audio_valid(wav)
 
+        *shape, C, T = wav.shape
 
-# @pytest.mark.manual
-# def test_load_audio_compare_backend(mp4_path, wav_path):
-#     wav, sr = load_audio(mp4_path, backend='torchaudio')
-#     wav2, sr2 = load_audio(wav_path, backend='torchaudio')
-
-#     assert wav.shape == wav2.shape
-#     assert sr == sr2
-
-
-# @pytest.mark.manual
-# def test_load_audio_compare_sampling_rate(mp4_path, wav_path):
-#     wav, sr = load_audio(mp4_path, sampling_rate=16000)
-#     wav2, sr2 = load_audio(wav_path, sampling_rate=16000)
-
-#     assert wav.shape == wav2.shape
-#     assert sr == sr2
-
-
-# def test_load_audio(wav_path):
-#     sr = 16000
-#     channels = 1
-#     wav, _sr = load_audio(wav_path, sampling_rate=sr, num_channels=channels)
-
-#     assert sr == _sr
-#     C, T = wav.shape
-#     assert C == channels
+        assert C == channels
 
 
 if __name__ == "__main__":

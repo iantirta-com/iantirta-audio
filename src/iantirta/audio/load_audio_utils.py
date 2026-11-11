@@ -243,7 +243,11 @@ def load_audio(
             return _load_audio_audioloader(audio_source, sampling_rate, num_channels)
 
 
-def _load_audio_torchcodec(audio_source, sampling_rate, num_channels):
+def _load_audio_torchcodec(
+    audio_source,
+    sampling_rate: int | None = None,
+    num_channels: int | None = None
+):
     from torchcodec.decoders import AudioDecoder
 
     logger.debug('load audio using torchcodec')
@@ -256,7 +260,11 @@ def _load_audio_torchcodec(audio_source, sampling_rate, num_channels):
     return audio_samples.data.numpy(), sampling_rate if sampling_rate is not None else audio_samples.sample_rate
 
 
-def _load_audio_librosa(audio_source, sampling_rate, num_channels):
+def _load_audio_librosa(
+    audio_source,
+    sampling_rate: int | None = None,
+    num_channels: int | None = None
+):
     from io import BytesIO
 
     import librosa
@@ -276,10 +284,15 @@ def _load_audio_librosa(audio_source, sampling_rate, num_channels):
     return wav, sampling_rate if sampling_rate is not None else src_sr
 
 
-def _load_audio_torchaudio(audio_source, sampling_rate, num_channels):
+def _load_audio_torchaudio(
+    audio_source,
+    sampling_rate: int | None = None,
+    num_channels: int | None = None
+):
     from io import BytesIO
 
     import torchaudio
+    from ._audio import convert_audio_channels
 
     logger.debug('load audio using torchaudio')
     wav, src_sr = torchaudio.load(BytesIO(audio_source) if isinstance(audio_source, bytes) else audio_source)
@@ -287,13 +300,17 @@ def _load_audio_torchaudio(audio_source, sampling_rate, num_channels):
     if sampling_rate and sampling_rate != src_sr:
         wav = torchaudio.functional.resample(wav, orig_freq=src_sr, new_freq=sampling_rate)
 
-    if num_channels == 1:
-        wav = wav.mean(dim=0) # To mono
+    if num_channels is not None:
+        wav = convert_audio_channels(wav, channels=num_channels)
 
     return wav.numpy().astype(np.float32), sampling_rate if sampling_rate is not None else src_sr
 
 
-def _load_audio_audioloader(audio_source, sampling_rate, num_channels):
+def _load_audio_audioloader(
+    audio_source,
+    sampling_rate: int | None = None,
+    num_channels: int | None = None
+):
     from ._audio import AudioLoader
 
     logger.debug('load audio using AudioLoader')
