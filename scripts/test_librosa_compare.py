@@ -21,6 +21,34 @@ from iantirta.audio.audio_extraction_utils import (
 from iantirta.audio.extraction_utils import spectrogram
 
 
+@pytest.fixture
+def separated_path() -> Path:
+    return Path(__file__).parent.parent / "tests" / 'separated.wav'
+
+
+class TestCompareLibrosa:
+    """
+    This unit test purposes is to help integrate
+    and migrating the use of librosa.
+    """
+
+    def __post_init__(self, make_audio):
+        self.sr = 16000
+        self.channels = 1
+        self.wav, sr = make_audio(
+            sr=self.sr,
+            channels=self.channels
+        )
+        
+        *shape, C, T = self.wav.shape
+        assert sr == self.sr
+        assert C == self.channels
+        
+        self.samples = self.wav.squeeze()
+
+    def test_compare_rms(self):
+        assert self.samples
+
 def test_compare_rms(make_audio):
     sr, c = 16000, 1
     dummy_audio = make_audio(sr=sr, channels=c)
@@ -248,9 +276,9 @@ def test_compare_make_frames(make_audio):
     print("="*50)
 
 
-def test_compare_autocorrelate(make_audio):
+def test_compare_autocorrelate(make_audio, separated_path):
     from iantirta.audio import load_audio
-    wav_path = Path(__file__).parent / 'separated.wav'
+    wav_path = separated_path
 
     sr, c = 16000, 1
     wav, sr = load_audio(wav_path, sampling_rate=sr, num_channels=c)
@@ -454,8 +482,17 @@ def test_compare_numba_vs_numpy_fallback(monkeypatch):
 
 
 if __name__ == "__main__":
+    from pathlib import Path
     import sys
+
+    conftest_path = (Path(__file__).parent.parent / "tests").resolve()
+    
+    if str(conftest_path) not in sys.path:
+        sys.path.insert(0, str(conftest_path))
+
+
     sys.exit(pytest.main([
         '-v', '-s',
+        '-p', 'conftest',
         __file__
     ]))

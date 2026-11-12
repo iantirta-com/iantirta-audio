@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iantirta-audio"
-version = "0.1.1a3"
+version = "0.1.1a4"
 
 authors = [
     { name = "Iantirta.com", email = "ian@iantirta.com" },
@@ -61,8 +61,9 @@ asr = ["torch",]
 
 mp3 = ["lameenc"]
 extraction = ["scipy"]
+optimization = ["numba"]
 
-all = ["iantirta-audio[separation, asr, mp3]",]
+all = ["iantirta-audio[separation, asr, mp3]"]
 
 docs = ["mkdocs-material"]
 test = ["pytest", "iantirta-media"]
