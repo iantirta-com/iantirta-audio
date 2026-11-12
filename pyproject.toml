@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iantirta-audio"
-version = "0.1.1a6"
+version = "0.1.1a7"
 
 authors = [
     { name = "Iantirta.com", email = "ian@iantirta.com" },
@@ -50,6 +50,7 @@ classifiers = [
 dependencies = [
     "iantirta-lazy_import",
     "numpy",
+    "torch"
 ]
 
 
@@ -58,10 +59,18 @@ mp3 = ["lameenc"]
 extraction = ["scipy"]
 optimization = ["numba"]
 
-all = ["iantirta-audio[mp3, extraction]"]
+all = [
+    "iantirta-audio[mp3, extraction]",
+    "torchaudio",
+    "torchcodec"
+]
 
 docs = ["mkdocs-material"]
-test = ["pytest", "iantirta-media", "iantirta-audio[optimization]"]
+test = [
+    "pytest",
+    "iantirta-media",
+    "iantirta-audio[optimization]"
+]
 dev = ["iantirta-audio[test, all]"]
 
 
