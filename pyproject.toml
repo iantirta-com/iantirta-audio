@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iantirta-audio"
-version = "0.1.1a7"
+version = "1.1.1"
 
 authors = [
     { name = "Iantirta.com", email = "ian@iantirta.com" },
@@ -14,7 +14,7 @@ maintainers = [
     { name = "Iantirta.com", email = "ian@iantirta.com" }
 ]
 
-description = "Reusable media downloading and metadata utilities for Python"
+description = "Audio loading, encoding, and signal-analysis utilities for Python"
 readme = "README.md"
 
 requires-python = ">=3.10"
