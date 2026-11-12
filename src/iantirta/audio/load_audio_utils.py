@@ -2,13 +2,9 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import numpy as np
-
-if TYPE_CHECKING:
-    pass
 
 __all__ = [
     "load_audio",

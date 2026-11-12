@@ -11,7 +11,7 @@ def test_audio_extraction_all():
     test audio extraction needed for making `audio_segments`
     """
     from iantirta.audio import load_audio
-    wav_path = Path(__file__).parent / 'separated.wav'
+    wav_path = Path(__file__).parent.parent / "tests" / 'separated.wav'
 
     sr, c = 16000, 1
     wav, sr = load_audio(wav_path, sampling_rate=sr, num_channels=c)
@@ -51,6 +51,7 @@ def test_audio_extraction_all():
 
     for aseg in audio_metadata.segments:
         print(aseg.start, aseg.end, f"Duration ({aseg.end - aseg.start})")
+    print(audio_metadata.segments)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,9 @@
 
+import html
 from pathlib import Path
 
 import numpy as np
 from IPython.display import Audio
-import html
-
 
 _HTML = r'''<!doctype html>
 <html lang="en">
