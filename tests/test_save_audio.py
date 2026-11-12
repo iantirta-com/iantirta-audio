@@ -1,11 +1,11 @@
 
-import pytest
 import logging
-
 from pathlib import Path
-import numpy as np
 
-from iantirta.audio import save_audio, load_audio
+import numpy as np
+import pytest
+
+from iantirta.audio import load_audio, save_audio
 
 
 def _is_lameenc_available() -> bool:
@@ -129,7 +129,7 @@ class TestSaveAudio:
         with caplog.at_level(logging.WARNING):
             print()
             for path in audio_paths:
-                is_quality = True if Path(path).name.startswith('qtest') else False
+                is_quality = bool(Path(path).name.startswith('qtest'))
                 save_audio(
                     dummy_audio, path, samplerate=sr,
                     **quality_kwargs if is_quality else {}
@@ -145,7 +145,7 @@ class TestSaveAudio:
     
                 path = Path(path)
                 size = path.stat().st_size
-                is_quality_str = f"High-Q: | " if is_quality else ""
+                is_quality_str = "High-Q: | " if is_quality else ""
                 print(
                     f"[STAT] Format: {path.suffix.ljust(5)} | "
                     f"Size: {size / 1024:6.2f} Kb | "
