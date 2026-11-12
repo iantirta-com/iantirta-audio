@@ -1,4 +1,5 @@
-
+# Part of Iantirta.com
+# See LICENSE file for full copyright and licensing details.
 
 from dataclasses import dataclass
 
@@ -12,6 +13,7 @@ __all__ = [
 @dataclass
 class HumanTiming:
     pass
+
 
 @dataclass(slots=True)
 class TimingMixin:

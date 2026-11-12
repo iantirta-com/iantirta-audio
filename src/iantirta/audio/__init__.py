@@ -1,9 +1,14 @@
 # Part of Iantirta.com
 # See LICENSE file for full copyright and licensing details.
+"""Audio utility."""
 
+from importlib.metadata import version
 from typing import TYPE_CHECKING
 
 from iantirta.lazy_import import LazyModule, define_import_structure
+
+__version__ = version("iantirta-audio")
+
 
 if TYPE_CHECKING:
     from ._audio import *
@@ -20,4 +25,5 @@ else:
         _file,
         define_import_structure(_file),
         module_spec=__spec__,
+        extra_objects={"__version__": __version__},
     )

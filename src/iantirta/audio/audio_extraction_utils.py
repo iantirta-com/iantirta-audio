@@ -1,3 +1,6 @@
+# Part of Iantirta.com
+# See LICENSE file for full copyright and licensing details.
+
 from __future__ import annotations
 
 import warnings
@@ -686,6 +689,80 @@ def abs2(
     else:
         # suppress type check, mypy doesn't know this is real
         return np.square(x, dtype=dtype)
+
+
+def times_like(
+    x: np.ndarray,
+    *,
+    sr: float,
+    hop_length: int,
+    n_fft: int | None = None,
+    axis: int = -1,
+) -> np.ndarray:
+    """
+    Return an array of time values to match the time axis from a feature matrix.
+
+    Parameters
+    ----------
+    X : np.ndarray or scalar
+        - If ndarray, X is a feature matrix, e.g. STFT, chromagram, or mel spectrogram.
+        - If scalar, X represents the number of frames.
+    sr : number > 0 [scalar]
+        audio sampling rate
+    hop_length : int > 0 [scalar]
+        number of samples between successive frames
+    n_fft : None or int > 0 [scalar]
+        Optional: length of the FFT frame.
+        If given, time conversion will include an offset of ``n_fft // 2``
+        to counteract windowing effects when using a non-centered STFT.
+    axis : int [scalar]
+        The axis representing the time axis of X.
+        By default, the last axis (-1) is taken.
+
+    Returns
+    -------
+    times : np.ndarray [shape=(n,)]
+        ndarray of times (in seconds) corresponding to each frame of X.
+    """
+    frames = np.arange(x.shape[axis])
+
+    offset = 0
+    if n_fft is not None:
+        offset = int(n_fft // 2)
+
+    samples = (
+        np.asanyarray(frames) * hop_length + offset
+    ).astype(int)[()]
+
+    times = np.asanyarray(samples)[()] / float(sr)
+    return times
+
+
+def midi_to_hz(notes) -> np.floating | np.ndarray:
+    """Get the frequency (Hz) of MIDI note(s)
+
+    Examples
+    --------
+    >>> midi_to_hz(36)
+    65.406
+
+    >>> midi_to_hz(np.arange(36, 48))
+    array([  65.406,   69.296,   73.416,   77.782,   82.407,
+             87.307,   92.499,   97.999,  103.826,  110.   ,
+            116.541,  123.471])
+
+    Parameters
+    ----------
+    notes : int or np.ndarray [shape=(n,), dtype=int]
+        midi number(s) of the note(s)
+
+    Returns
+    -------
+    frequency : number or np.ndarray [shape=(n,), dtype=float]
+        frequency (frequencies) of ``notes`` in Hz
+    """
+    return 440.0 * (2.0 ** ((np.asanyarray(notes)[()] - 69.0) / 12.0))
+
 
 # ------------------
 # API Method

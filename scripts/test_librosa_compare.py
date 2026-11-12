@@ -1,3 +1,6 @@
+# Part of Iantirta.com
+# See LICENSE file for full copyright and licensing details.
+
 import builtins
 import importlib
 import sys
@@ -17,13 +20,10 @@ from iantirta.audio.audio_extraction_utils import (
     pyin,
     rms,
     stft,
+    times_like,
+    midi_to_hz
 )
 from iantirta.audio.extraction_utils import spectrogram
-
-
-@pytest.fixture
-def separated_path() -> Path:
-    return Path(__file__).parent.parent / "tests" / 'separated.wav'
 
 
 class TestCompareLibrosa:
@@ -255,6 +255,60 @@ class TestCompareLibrosa:
         self.assert_compare(custom_frame, librosa_frame)
         self.calculate_compare_value(custom_frame, librosa_frame)
 
+    def test_compare_times_like(self):
+        """
+        Test times like
+        """
+        def custom_times():
+            return times_like(
+                x=self.wav,
+                sr=self.sr,
+                hop_length=self.hop_length,
+                n_fft=self.n_fft,
+            )
+
+        def librosa_times():
+            return librosa.times_like(
+                X=self.wav,
+                sr=self.sr,
+                hop_length=self.hop_length,
+                n_fft=self.n_fft,
+            )
+
+        self.assert_compare(custom_times, librosa_times)
+        self.calculate_compare_value(custom_times, librosa_times)
+
+    @pytest.mark.parametrize(
+        ("note", "midi"),
+        [
+            ("C2", 36),
+            ("C7", 96)
+        ]
+    )
+    def test_compare_midi_to_hz(self, note, midi):
+        """
+        With librosa we use note as ``C2``.
+        but with ours we use midi int value ``36``
+        """
+        def custom_midi_hz():
+            return midi_to_hz(midi)
+
+        def librosa_midi_hz():
+            return librosa.note_to_hz(note)
+
+        self.assert_compare(custom_midi_hz, librosa_midi_hz)
+        self.calculate_compare_value(custom_midi_hz, librosa_midi_hz)
+
+    @pytest.mark.parametrize(
+        ("midi"),
+        [
+            [36, 96]
+        ]
+    )
+    def test_compare_midi_to_hz_multi(self, midi):
+        hzs = midi_to_hz(midi)
+        assert len(hzs) == len(midi)
+    
     def _setup_y_frames(self):
         self.fmin = librosa.note_to_hz("C2")
         self.fmax = librosa.note_to_hz('C7')
@@ -437,4 +491,5 @@ if __name__ == "__main__":
         '-v', '-s',
         '-p', 'conftest',
         __file__
+        + "::TestCompareLibrosa::test_compare_midi_to_hz_multi"
     ]))

@@ -1,8 +1,9 @@
+# Part of Iantirta.com
+# See LICENSE file for full copyright and licensing details.
 
 from dataclasses import dataclass
 from pathlib import Path
 
-import librosa
 import numpy as np
 
 from iantirta.audio import AudioSegment, load_audio
@@ -18,6 +19,8 @@ from iantirta.audio.audio_extraction_utils import (
     pyin,
     split_long_block_mask,
     uniform_1d,
+    times_like,
+    midi_to_hz
 )
 from iantirta.audio.audio_extraction_utils import rms as rms_lib
 from iantirta.audio.extraction_utils import spectrogram
@@ -160,21 +163,23 @@ class AudioExtraction:
     # -----------------------
 
     def get_pyin(self):
+        # 36 == C2, 96 == C7
+        fmin, fmax = midi_to_hz([36, 96])
         f0, voiced_flag, voiced_probs = pyin(
             self.samples,
             sr=self.sr,
-            fmin=np.float64(65.40639132514966),  # C2
-            fmax=np.float64(2093.004522404789),  # C7
+            fmin=fmin,  # C2
+            fmax=fmax,  # C7
             frame_length=self.win_length,
             hop_length=self.hop_length,
-            n_thresholds= 100,
-            beta_parameters= (2, 18),
-            boltzmann_parameter= 2,
-            resolution= 0.1,
-            max_transition_rate= 35.92,
-            switch_prob= 0.01,
-            no_trough_prob= 0.01,
-            fill_na= np.nan,
+            n_thresholds=100,
+            beta_parameters=(2, 18),
+            boltzmann_parameter=2,
+            resolution=0.1,
+            max_transition_rate=35.92,
+            switch_prob=0.01,
+            no_trough_prob=0.01,
+            fill_na=np.nan,
             center=True,
             pad_mode="reflect",
             transition_min_prob=1e-4,
@@ -192,7 +197,7 @@ class AudioExtraction:
         arr = mask_uniform(arr, hop_duration_ms=self.hop_duration_ms)
         arr = mask_delete(arr, hop_duration_ms=self.hop_duration_ms)
         arr = mask_merge_lower_duration(arr, hop_duration_ms=self.hop_duration_ms)
-        
+
         max_block_ms: int = 10000
         min_block_ms: int = 1000
         max_frame = ms2frame(max_block_ms, hop_duration_ms=self.hop_duration_ms)
@@ -278,7 +283,7 @@ class AudioExtraction:
         based on threshold and features.
         """
         activity_mask = self.rms.mask | self.mel_spectrogram.mask
-        
+
         activity_mask = mask_merge_forward(
             activity_mask,
             self.rms.valleys,
@@ -329,8 +334,8 @@ class AudioExtraction:
     @property
     def times(self) -> np.ndarray:
         if self._times is None:
-            self._times = librosa.times_like(
-                X=self.wav,
+            self._times = times_like(
+                x=self.wav,
                 sr=self.sr,
                 hop_length=self.hop_length,
                 n_fft=self.n_fft,

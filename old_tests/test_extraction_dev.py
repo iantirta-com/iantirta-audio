@@ -1,3 +1,6 @@
+# Part of Iantirta.com
+# See LICENSE file for full copyright and licensing details.
+
 import timeit
 from pathlib import Path
 

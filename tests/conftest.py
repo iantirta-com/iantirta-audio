@@ -1,3 +1,5 @@
+# Part of Iantirta.com
+# See LICENSE file for full copyright and licensing details.
 
 from pathlib import Path
 
@@ -46,6 +48,11 @@ def mp4_path(base_dir_tests):
 @pytest.fixture
 def wav_path(request, base_dir_tests):
     return base_dir_tests / 'test.wav'
+
+
+@pytest.fixture
+def separated_path() -> Path:
+    return Path(__file__).parent.parent / "tests" / 'separated.wav'
 
 
 if __name__ == "__main__":
