@@ -17,11 +17,11 @@ from iantirta.audio.audio_extraction_utils import (
     autocorrelate,
     frame,
     melspectrogram,
+    midi_to_hz,
     pyin,
     rms,
     stft,
     times_like,
-    midi_to_hz
 )
 from iantirta.audio.extraction_utils import spectrogram
 

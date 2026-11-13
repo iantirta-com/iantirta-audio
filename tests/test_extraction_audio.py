@@ -1,13 +1,11 @@
 # Part of Iantirta.com
 # See LICENSE file for full copyright and licensing details.
 
-from pathlib import Path
-
 import pytest
 
-from iantirta.audio.audio_extraction_utils import times_like
-from iantirta.audio.audio_extraction import AudioExtraction
 from iantirta.audio import load_audio
+from iantirta.audio.audio_extraction import AudioExtraction
+from iantirta.audio.audio_extraction_utils import times_like
 
 
 class TestAudioExtraction:
