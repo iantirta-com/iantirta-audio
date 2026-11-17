@@ -75,7 +75,7 @@ class ModelAudioSeparation:
         *,
         logger: logging.Logger | None = None
     ):
-        if sample_rate != self._samplerate:
+        if sample_rate != self.model.samplerate:
             (logger or self.logger).warning(
                 "Different sample rate than model "
                 f"Model={self._samplerate} -> {sample_rate}"
