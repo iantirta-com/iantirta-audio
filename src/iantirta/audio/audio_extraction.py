@@ -198,8 +198,8 @@ class AudioExtraction:
         arr = mask_delete(arr, hop_duration_ms=self.hop_duration_ms)
         arr = mask_merge_lower_duration(arr, hop_duration_ms=self.hop_duration_ms)
 
-        max_block_ms: int = 10000
-        min_block_ms: int = 1000
+        max_block_ms: int = 15000
+        min_block_ms: int = 5000
         max_frame = ms2frame(max_block_ms, hop_duration_ms=self.hop_duration_ms)
         min_frame = ms2frame(min_block_ms, hop_duration_ms=self.hop_duration_ms)
         voiced_probs = self.voiced_probs

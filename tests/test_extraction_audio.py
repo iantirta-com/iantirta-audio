@@ -4,7 +4,7 @@
 import pytest
 
 from iantirta.audio import load_audio
-from iantirta.audio.audio_extraction import AudioExtraction
+from iantirta.audio.audio_extraction import AudioExtraction, detect_audio_activity
 from iantirta.audio.audio_extraction_utils import times_like
 
 
@@ -61,6 +61,19 @@ class TestAudioExtraction:
         for aseg in self.aad.segments:
             print(aseg.start, aseg.end, f"Duration ({aseg.end - aseg.start})")
         print(self.aad.segments)
+
+    def test_compare_audio_activity_detection(self, separated_path):
+        sr = 16000
+        res = detect_audio_activity(separated_path, sr)
+
+        from kplus.pipelines.audio import detect_audio_activity as k_detect_audio_activity
+        k_res = k_detect_audio_activity(separated_path, sr, no_show=True)
+
+        for seg, kseg in zip(res.segments, k_res.segments):
+            if seg.start != kseg.start:
+                print("! Different Start:", seg.start, kseg.start)
+            if seg.end != kseg.end:
+                print("! Different End:", seg.end, kseg.end)
 
 
 if __name__ == "__main__":

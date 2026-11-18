@@ -52,7 +52,7 @@ def wav_path(request, base_dir_tests):
 
 @pytest.fixture
 def separated_path() -> Path:
-    return Path(__file__).parent.parent / "tests" / 'separated.wav'
+    return Path(__file__).parent.parent / "tests" / 'test_vocal.wav'
 
 
 if __name__ == "__main__":
